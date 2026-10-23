@@ -567,9 +567,23 @@ def _caller_from_request(request: Optional[Request], default: str = "userB") -> 
             raise HTTPException(status_code=401, detail="invalid_token")
         return token_info["user_id"]
     
-    if (os.environ.get("DEMO_MODE","").lower()=="true" and request is not None and not request.headers.get("x-forwarded-for")):
-        return default
-    raise HTTPException(status_code=401,detail="missing_token")
+    # Strict local-loopback gating for DEMO_MODE:
+    # 1. Never allowed in production
+    # 2. Never allowed if request passed through a reverse proxy or public tunnel (x-forwarded-for/x-real-ip)
+    # 3. Only allowed for localhost loopback test clients
+    is_prod = os.environ.get("ENVIRONMENT", "").lower() in ("production", "prod")
+    is_demo = os.environ.get("DEMO_MODE", "").lower() == "true"
+    
+    if is_demo and not is_prod:
+        client_ip = request.client.host if request.client else ""
+        has_forwarded = bool(request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip"))
+        if client_ip in ("127.0.0.1", "::1", "localhost", "testclient") and not has_forwarded:
+            return default
+            
+    raise HTTPException(
+        status_code=401,
+        detail="missing_token: Authorization Bearer token required for external or production requests"
+    )
 
 # =====================================================================
 # MCP Bridge (calls real /mcp endpoint via official Python client)
