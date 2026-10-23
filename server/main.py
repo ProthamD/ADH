@@ -564,8 +564,12 @@ def _caller_from_request(request: Optional[Request], default: str = "userB") -> 
     if auth:
         token_info = validate_bearer_token(auth)
         if token_info:
-            return token_info["user_id"]
-    return default
+            raise HTTPException(status_code=401,detail="invalid_token")
+        return token_info["user_id"]
+    
+    if (os.environ.get("DEMO_MODE","").lower()=="true" and request is not None and not request.headers.get("x-forwarded-for")):
+        return default
+    raise HTTPException(status_code=401,detail="missing_token")
 
 # =====================================================================
 # MCP Bridge (calls real /mcp endpoint via official Python client)

@@ -91,8 +91,8 @@ function showToast(message, type = "info", duration = 3500) {
 
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
-  const icons = { info: "ℹ️", success: "✅", warning: "⚠️", error: "❌", security: "🛡️" };
-  toast.innerHTML = `<span class="toast-icon">${icons[type] || "ℹ️"}</span><span class="toast-msg">${escapeHtml(message)}</span>`;
+  const icons = { info: "info", success: "check", warning: "alert", error: "xcircle", security: "shield" };
+  toast.innerHTML = `<span class="toast-icon">${ic(icons[type] || "info")}</span><span class="toast-msg">${escapeHtml(message)}</span>`;
   tc.appendChild(toast);
 
   // Animate in
@@ -171,7 +171,7 @@ function initScamCheck() {
     const resultBox = document.getElementById("scamCheckResult");
     const btn = form.querySelector("button[type=submit]");
     btn.disabled = true;
-    if (resultBox) resultBox.innerHTML = `<div class="scam-checking">🔍 Analyzing with AWS Bedrock...</div>`;
+    if (resultBox) resultBox.innerHTML = `<div class="scam-checking">${ic("search")} Analyzing with AWS Bedrock...</div>`;
     try {
       const res = await fetch("/api/security/check-scam", {
         method: "POST",
@@ -181,8 +181,8 @@ function initScamCheck() {
       const data = await res.json();
       const verdictClass = data.verdict === "likely_scam" ? "scam-red" :
                            data.verdict === "suspicious" ? "scam-amber" : "scam-green";
-      const verdictIcon = data.verdict === "likely_scam" ? "🚨" :
-                          data.verdict === "suspicious" ? "⚠️" : "✅";
+      const verdictIcon = data.verdict === "likely_scam" ? ic("alert") :
+                          data.verdict === "suspicious" ? ic("alert") : ic("check");
       const reasons = (data.reasons || []).map(r => `<li>${escapeHtml(r)}</li>`).join("");
       if (resultBox) {
         resultBox.innerHTML = `
@@ -190,11 +190,11 @@ function initScamCheck() {
             ${verdictIcon} <strong>${data.verdict?.replace(/_/g, " ").toUpperCase()}</strong>
           </div>
           ${reasons ? `<ul class="scam-reasons">${reasons}</ul>` : ""}
-          ${data.suggested_action ? `<div class="scam-action">💡 ${escapeHtml(data.suggested_action)}</div>` : ""}
+          ${data.suggested_action ? `<div class="scam-action">${ic("bulb")} ${escapeHtml(data.suggested_action)}</div>` : ""}
         `;
       }
     } catch (err) {
-      if (resultBox) resultBox.innerHTML = `<div class="scam-error">⚠️ Analysis failed: ${escapeHtml(err.message)}</div>`;
+      if (resultBox) resultBox.innerHTML = `<div class="scam-error">${ic("alert")} Analysis failed: ${escapeHtml(err.message)}</div>`;
     } finally {
       btn.disabled = false;
     }
@@ -221,7 +221,7 @@ function connectSSE() {
   };
   sseSource.onerror = () => {
     // SSE failed; polling fallback already active
-    updateHeaderStatus("⚡ Live updates unavailable, polling...", false);
+    updateHeaderStatus("Live updates unavailable, polling...", false);
   };
   sseSource.onopen = () => {
     updateHeaderStatus("Streamable HTTP: /mcp", true);
@@ -242,7 +242,7 @@ function appendTraceEntry(entry) {
   const term = document.getElementById("traceTerminal");
   if (!term) return;
   const time = entry.ts ? new Date(entry.ts).toLocaleTimeString() : "";
-  const direction = entry.type === "REQUEST" ? "→ [REQ]" : entry.type === "RESPONSE" ? "← [RES]" : "⚡ [DIRECT]";
+  const direction = entry.type === "REQUEST" ? "→ [REQ]" : entry.type === "RESPONSE" ? "← [RES]" : "[DIRECT]";
   const cssClass = entry.type === "REQUEST" ? "trace-req" : entry.type === "RESPONSE" ? "trace-res" : "trace-direct";
 
   const line = document.createElement("div");
@@ -305,7 +305,7 @@ function addFactRow(label = "", value = "") {
   div.innerHTML = `
     <input type="text" class="form-input fact-label" placeholder="Label (e.g. key location)" value="${escapeHtml(label)}" required>
     <input type="text" class="form-input fact-value" placeholder="Value (Secret)" value="${escapeHtml(value)}" required>
-    <button type="button" class="btn-icon btn-remove-fact" title="Remove fact">✕</button>
+    <button type="button" class="btn-icon btn-remove-fact" title="Remove fact">${ic("x")}</button>
   `;
   container.appendChild(div);
 }
@@ -442,7 +442,7 @@ async function executeAskQuery(question, codeword) {
     if (data.status === "allowed") {
       speechText.innerText = `"${data.answer || data.message}"`;
       slicingBadge.style.display = "flex";
-      slicingBadge.innerHTML = `🛡️ Semantic Slicing: ${data.facts_released || 1} fact(s) released &nbsp;|&nbsp; Uses: ${data.uses}/${data.max_uses}`;
+      slicingBadge.innerHTML = `${ic("shield")} Semantic Slicing: ${data.facts_released || 1} fact(s) released &nbsp;|&nbsp; Uses: ${data.uses}/${data.max_uses}`;
       responseBox.classList.add("response-allowed");
       showToast(`Access granted — ${data.facts_released || 1} fact(s) released.`, "success");
     } else if (data.status === "denied" || data.status === "locked" || data.status === "auth_failed" || data.status === "expired") {
@@ -610,8 +610,8 @@ function renderDelegations(data) {
         <span class="usage-bar-label">${d.uses}/${d.max_uses} uses</span>
       </div>
       <div class="card-actions">
-        <button class="btn-card-action" onclick="showInlineAudit('${d.id}')">🔍 Audit Trail</button>
-        ${d.status === "active" ? `<button class="btn-card-action btn-card-revoke" onclick="revokeDelegation('${d.id}')">🚫 Revoke</button>` : ""}
+        <button class="btn-card-action" onclick="showInlineAudit('${d.id}')">${ic("search")} Audit Trail</button>
+        ${d.status === "active" ? `<button class="btn-card-action btn-card-revoke" onclick="revokeDelegation('${d.id}')">${ic("ban")} Revoke</button>` : ""}
       </div>
     `;
     listContainer.appendChild(card);
@@ -643,7 +643,7 @@ function showConfirmToast(message) {
     const toast = document.createElement("div");
     toast.className = "toast toast-confirm toast-show";
     toast.innerHTML = `
-      <span class="toast-msg">⚠️ ${escapeHtml(message)}</span>
+      <span class="toast-msg">${ic("alert")} ${escapeHtml(message)}</span>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="btn-toast-confirm">Confirm</button>
         <button class="btn-toast-cancel">Cancel</button>
@@ -780,7 +780,7 @@ function initVoiceInput() {
     recognition.maxAlternatives = 1;
 
     micButton.classList.add("mic-listening");
-    showToast("🎙️ Listening... speak now", "info", 2000);
+    showToast("Listening... speak now", "info", 2000);
 
     recognition.onresult = (event) => {
       const transcript = Array.from(event.results)
@@ -827,7 +827,7 @@ function speakText(text) {
   if (!('speechSynthesis' in window)) return;
   const privacyMode = document.getElementById("chkPrivacyMode")?.checked;
   if (privacyMode) {
-    showToast("🔒 Privacy Mode active: speech output silenced.", "info");
+    showToast("Privacy Mode active: speech output silenced.", "info");
     return;
   }
   window.speechSynthesis.cancel();
@@ -857,7 +857,7 @@ function initResetButton() {
     try {
       const res = await fetch("/api/debug/reset", { method: "POST" });
       const data = await res.json();
-      showToast("🧹 Demo reset complete. Pristine state ready.", "info");
+      showToast("Demo reset complete. Pristine state ready.", "info");
       refreshAll();
     } catch (err) {
       showToast("Reset failed: " + err.message, "error");
@@ -870,7 +870,7 @@ function initAuditChainVerification() {
   document.getElementById("headerChainStatus")?.addEventListener("click", async () => {
     const data = await verifyAuditChainUI();
     if (data) {
-      showToast(`🔗 Audit Chain: ${data.status.toUpperCase()} (${data.total_events} events verified)`, data.status === "intact" ? "success" : "error", 4000);
+      showToast(`Audit Chain: ${data.status.toUpperCase()} (${data.total_events} events verified)`, data.status === "intact" ? "success" : "error", 4000);
     }
   });
 }
@@ -915,7 +915,7 @@ function initAwsStatus() {
       const staged = d.s3_vault?.staged_events_count || 0;
       
       showToast(
-        `☁️ AWS Serverless Active:\n` +
+        `AWS Serverless Active:\n` +
         `• S3 Vault: ${s3Bucket} (${staged} staged events)\n` +
         `• Lambda Escalation: ${lambdaName}\n` +
         `• CloudWatch Telemetry: ${cwNamespace}\n` +
@@ -934,7 +934,7 @@ function initAwsStatus() {
       const d = await res.json();
       const engine = d.semantic_engine || {};
       showToast(
-        `⚡ ${engine.name || "FastSemanticRouter"}:\n` +
+        `${engine.name || "FastSemanticRouter"}:\n` +
         `• Algorithm: ${engine.algorithm || "TF-IDF Vector Cosine Similarity"}\n` +
         `• Latency: ${engine.latency_target || "< 5ms"}\n` +
         `• Zero-Leak Guarantee: Enforced (Blind Gatekeeper)\n` +
@@ -949,6 +949,10 @@ function initAwsStatus() {
 }
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
+function ic(name) {
+  return `<svg class="ic" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+}
+
 function escapeHtml(str) {
   if (!str) return "";
   return String(str)
@@ -958,5 +962,3 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
-
-
