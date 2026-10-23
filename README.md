@@ -177,16 +177,3 @@ python scripts/run_gate_bench.py [--mock]
 - **Hardware Simulation Notice**: The Web Simulator provides a browser-based simulation of Alexa+ voice input/output (using Web Speech API `SpeechRecognition` and `speechSynthesis`) and raw MCP protocol streaming. It was tested against MCP 2.x and Bedrock Nova Micro APIs, not physical Alexa hardware.
 
 ---
-
-## 8. Demo Video Walkthrough (Under 3 Minutes)
-
-1. **0:00 - 0:25 (The Pitch):** Show the problem of sharing raw notes vs delegating answers with custody intact.
-2. **0:25 - 0:50 (User A Console):** Click the **"🚀 On-Call"** scenario preset in Column 1. Form populates with rollback steps, codeword `"solaris"`, 1 use, and 10-minute expiry. Click **"🔒 Delegate to Alexa+"**.
-3. **0:50 - 1:30 (The Test Cases in Column 3):**
-   - Click **"Case 2: Out-Of-Scope"**: Asks for company finances -> Blocked by Stage 1 Gatekeeper.
-   - Click **"Case 3: Jailbreak"**: Attempt to dump secrets -> Blocked by Gatekeeper fail-closed defense.
-   - Click **"Case 1: In-Scope"**: Asks for rollback command with codeword `" Solaris. "` -> Authorized, 1 fact released with semantic slicing, and Alexa+ speaks the concise answer (with Privacy Mode toggle support).
-4. **1:30 - 2:00 (Audit & Revoke):** User A clicks **"🔍 Check Audit"** -> Shows audit event with verified SHA-256 hash chain and zero secret leakage. Show instant revocation on an active delegation.
-5. **2:00 - 2:30 (Time-Locked Escalation):** Create another delegation. In the center hub, click **"⏩ Fast-Forward (Escalate)"**. The countdown reaches zero, the out-of-band webhook fires, and Column 3 immediately displays an **Urgent Alexa+ Priority Briefing**!
-6. **2:30 - 3:00 (Wrap-up):** Show the Raw MCP JSON-RPC Inspector demonstrating real Streamable HTTP traffic against `/mcp`.
-
