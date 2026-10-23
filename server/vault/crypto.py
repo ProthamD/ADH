@@ -17,9 +17,15 @@ MAX_FACTS_PER_ANSWER = int(os.environ.get("MAX_FACTS_PER_ANSWER", "2"))
 def get_fernet() -> Fernet:
     global _FERNET_KEY
     if not _FERNET_KEY:
-        raise RuntimeError(
-            "ENCRYPTION_KEY is not set. Run 'python scripts/gen_keys.py' and set it in .env"
-        )
+        _FERNET_KEY = os.environ.get("ENCRYPTION_KEY")
+    if not _FERNET_KEY:
+        if os.environ.get("DEMO_MODE", "").lower() == "true":
+            _FERNET_KEY = "leEK-BwIZD-BoNeYgWcKg6Du-BwCIc5vebIDNYrHXHU="
+            os.environ["ENCRYPTION_KEY"] = _FERNET_KEY
+        else:
+            raise RuntimeError(
+                "ENCRYPTION_KEY is not set. Run 'python scripts/gen_keys.py' and set it in .env"
+            )
     return Fernet(_FERNET_KEY.encode() if isinstance(_FERNET_KEY, str) else _FERNET_KEY)
 
 def normalize_codeword(cw: str) -> str:
@@ -46,9 +52,13 @@ def hash_codeword(codeword: str, hmac_secret: Optional[str] = None) -> str:
     Computes a keyed HMAC-SHA256 hash of the normalized codeword.
     A keyed hash prevents rainbow-table and brute-force attacks on low-entropy spoken words.
     """
-    secret = (hmac_secret or _HMAC_SECRET)
+    secret = (hmac_secret or _HMAC_SECRET or os.environ.get("HMAC_SECRET", ""))
     if not secret:
-        raise RuntimeError("HMAC_SECRET is not set. Cannot hash codeword securely.")
+        if os.environ.get("DEMO_MODE", "").lower() == "true":
+            secret = "8eff666b3a848bd842fb2abafe43a427ac08830c8e0881f2b133f9bc40722626"
+            os.environ["HMAC_SECRET"] = secret
+        else:
+            raise RuntimeError("HMAC_SECRET is not set. Cannot hash codeword securely.")
     normalized = normalize_codeword(codeword).encode("utf-8")
     return hmac.new(secret.encode("utf-8"), normalized, hashlib.sha256).hexdigest()
 
