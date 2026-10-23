@@ -2,6 +2,9 @@
 
 > **"Don't share the secret, delegate the answer."**
 
+### Try it out : https://alexa-delegation-broker.onrender.com/
+
+
 An auditable, time-locked, semantically sliced delegation broker built for **Alexa+** as a self-hosted **Model Context Protocol (MCP)** server over **Streamable HTTP** (spec 2025-11-25+), paired with the **AWS Builder mini-challenge** powered by **Amazon Bedrock**.
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
