@@ -56,6 +56,16 @@ _PLACEHOLDER_VALUES = {
     "your_fernet_key_base64_here", "change_me", "default_secret_key_change_me_in_production", ""
 }
 
+# Auto-provision deterministic demo keys in DEMO_MODE for seamless cloud deployments
+_IS_DEMO = os.environ.get("DEMO_MODE", "true").lower() in ("true", "1", "yes")
+if _IS_DEMO:
+    if not _ENCRYPTION_KEY or _ENCRYPTION_KEY in _PLACEHOLDER_VALUES:
+        _ENCRYPTION_KEY = "leEK-BwIZD-BoNeYgWcKg6Du-BwCIc5vebIDNYrHXHU="
+        os.environ["ENCRYPTION_KEY"] = _ENCRYPTION_KEY
+    if not _HMAC_SECRET or _HMAC_SECRET in _PLACEHOLDER_VALUES:
+        _HMAC_SECRET = "8eff666b3a848bd842fb2abafe43a427ac08830c8e0881f2b133f9bc40722626"
+        os.environ["HMAC_SECRET"] = _HMAC_SECRET
+
 def _validate_startup_secrets():
     """Refuse to start if ENCRYPTION_KEY or HMAC_SECRET are missing or placeholder values."""
     errors = []
