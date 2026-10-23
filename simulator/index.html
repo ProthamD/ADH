@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alexa+ Delegation Broker • MCP Server & Simulator</title>
+  <title>Alexa+ Delegation Broker • MCP Server &amp; Simulator</title>
+  <meta name="description" content="Live 3-column simulator for the Alexa+ Delegation Broker: encrypted, time-locked AI-to-AI delegations powered by AWS Bedrock and MCP Streamable HTTP.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -18,28 +19,34 @@
       <div>
         <h1>Alexa+ Delegation Broker</h1>
       </div>
-      <span class="badge">MCP Server (Streamable HTTP)</span>
-      <span class="badge" style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; border-color: rgba(245, 158, 11, 0.3);">AWS Bedrock Stage 1</span>
+      <span class="badge" title="Official MCP Streamable HTTP transport">MCP Streamable HTTP</span>
+      <span class="badge badge-aws badge-clickable" id="badgeAwsCloud" title="Click to inspect AWS Serverless Architecture (S3, Lambda, CloudWatch, SNS)">☁️ AWS Serverless (S3 • Lambda • CW)</span>
+      <span class="badge badge-amber badge-clickable" id="badgeSemanticEngine" title="Autonomous Semantic Router: Sub-5ms Vector Intent Routing">⚡ Fast Semantic Engine (&lt;5ms)</span>
     </div>
     <div class="header-meta">
-      <div class="status-pill">
+      <div class="status-pill" role="status" title="Streamable HTTP MCP Endpoint">
         <span class="status-dot"></span>
         <span id="headerMcpStatus">Streamable HTTP: /mcp</span>
       </div>
-      <button class="btn-secondary-sm" id="btnRefreshAll" title="Refresh state">🔄 Refresh</button>
+      <div class="status-pill status-pill-clickable" id="headerChainStatus" title="Cryptographic SHA-256 Tamper-Evident Audit Chain" role="status">
+        <span class="status-dot" id="chainDot" style="background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green);"></span>
+        <span id="chainStatusText">Audit Chain: Intact</span>
+      </div>
+      <button class="btn-secondary-sm" id="btnRefreshAll" title="Refresh all state" aria-label="Refresh application state">🔄 Refresh</button>
+      <button class="btn-secondary-sm" id="btnResetDemo" title="Clear DB to pristine demo state" aria-label="Reset demo state">🧹 Reset Take</button>
     </div>
   </header>
 
   <!-- 3-Column Experience Grid -->
-  <main class="simulator-container">
+  <main class="simulator-container" role="main">
 
     <!-- ============================================================== -->
     <!-- COLUMN 1: USER A (OWNER VOICE CONSOLE)                         -->
     <!-- ============================================================== -->
-    <section class="col-panel" id="panelUserA">
+    <section class="col-panel" id="panelUserA" role="region" aria-label="User A Owner Voice Console">
       <div class="panel-header">
         <div class="panel-title">
-          <span class="icon">🎙️</span>
+          <span class="icon" aria-hidden="true">🎙️</span>
           <span>User A (Owner)</span>
           <span class="user-badge user-a-badge">ALEXA+ CONSOLE</span>
         </div>
@@ -50,20 +57,20 @@
         <div>
           <div class="section-title">
             <span>Quick Scenarios</span>
-            <span style="font-size: 0.7rem; color: var(--alexa-cyan);">Click to populate</span>
+            <span class="section-hint">Click to populate</span>
           </div>
           <div class="presets-grid">
             <button type="button" class="btn-preset" id="presetOnCall">
               <strong>🚀 On-Call</strong>
-              <div style="font-size: 0.68rem; color: var(--text-subtle);">Server rollback</div>
+              <div class="preset-sub">Server rollback</div>
             </button>
             <button type="button" class="btn-preset" id="presetHouseSitter">
               <strong>🔑 House Sitter</strong>
-              <div style="font-size: 0.68rem; color: var(--text-subtle);">Key & Alarm</div>
+              <div class="preset-sub">Key &amp; Alarm</div>
             </button>
             <button type="button" class="btn-preset" id="presetCaretaker">
               <strong>💊 Caretaker</strong>
-              <div style="font-size: 0.68rem; color: var(--text-subtle);">Medication timing</div>
+              <div class="preset-sub">Medication timing</div>
             </button>
           </div>
         </div>
@@ -72,7 +79,7 @@
         <form id="createDelegationForm" class="form-group" style="gap: 14px;">
           <div class="section-title">
             <span>Create Delegation</span>
-            <span style="font-size: 0.7rem; color: var(--text-subtle);">Encrypted Vault</span>
+            <span class="section-hint">Fernet-Encrypted Vault</span>
           </div>
 
           <div class="form-row">
@@ -129,14 +136,23 @@
         <div>
           <div class="section-title">
             <span>Active Delegations</span>
-            <span id="delegationCount" style="color: var(--alexa-cyan);">0</span>
+            <span id="delegationCount" class="count-badge">0</span>
           </div>
           <div class="delegations-list" id="delegationsList">
-            <!-- Rendered dynamically -->
             <div style="font-size: 0.8rem; color: var(--text-subtle); text-align: center; padding: 20px;">
               No delegations created yet. Use a preset above to create one.
             </div>
           </div>
+        </div>
+
+        <!-- Inline Audit Panel (hidden by default) -->
+        <div class="inline-audit-panel" id="inlineAuditPanel" style="display: none;">
+          <div class="audit-panel-header">
+            <span id="auditPanelTitle">Audit Trail</span>
+            <button class="btn-icon" id="btnCloseAuditPanel" title="Close">✕</button>
+          </div>
+          <div class="audit-panel-summary" id="auditPanelSummary"></div>
+          <div class="audit-panel-events" id="auditPanelEvents"></div>
         </div>
       </div>
     </section>
@@ -144,11 +160,11 @@
     <!-- ============================================================== -->
     <!-- COLUMN 2: COMMAND CENTER, LIVE AUDIT & MCP PROTOCOL TRACE       -->
     <!-- ============================================================== -->
-    <section class="col-panel" id="panelCenter">
+    <section class="col-panel" id="panelCenter" role="region" aria-label="Command Center, Live Audit and Protocol Trace">
       <div class="panel-header">
         <div class="panel-title">
-          <span class="icon">⚡</span>
-          <span>Command Center & Protocol Hub</span>
+          <span class="icon" aria-hidden="true">⚡</span>
+          <span>Command Center &amp; Protocol Hub</span>
           <span class="user-badge center-badge">LIVE PROTOCOL</span>
         </div>
       </div>
@@ -157,11 +173,11 @@
         <!-- Live Countdown & Escalation Fast Forward -->
         <div class="timer-banner" id="timerBanner">
           <div class="timer-info">
-            <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Active Expiry Clock</span>
-            <span class="timer-countdown" id="activeCountdown">--:--:--</span>
-            <span style="font-size: 0.72rem; color: var(--text-subtle);" id="activeDelegationSummary">No active delegation selected</span>
+            <span class="timer-label">Active Expiry Clock</span>
+            <span class="timer-countdown" id="activeCountdown" role="timer" aria-live="off">--:--:--</span>
+            <span class="timer-desc" id="activeDelegationSummary">No active delegation</span>
           </div>
-          <button class="btn-action-amber" id="btnFastForward" title="Advance clock to 1s in past and trigger scheduler tick">
+          <button class="btn-action-amber" id="btnFastForward" title="Advance clock past expiry and trigger escalation" aria-label="Fast forward active delegation deadline">
             <span>⏩ Fast-Forward (Escalate)</span>
           </button>
         </div>
@@ -170,27 +186,41 @@
         <div>
           <div class="section-title">
             <span>Live Audit Trail</span>
-            <span style="font-size: 0.7rem; color: var(--accent-green);">🛡️ Zero Secrets in Logs</span>
+            <span class="section-hint" style="color: var(--accent-green);">🛡️ Zero Secrets in Logs</span>
           </div>
-          <div class="audit-feed" id="auditFeed">
-            <!-- Dynamic audit events -->
-            <div style="font-size: 0.8rem; color: var(--text-subtle); text-align: center; padding: 20px;">
+          <div class="audit-feed" id="auditFeed" role="log" aria-live="polite" aria-label="Live audit events">
+            <div style="font-size: 0.85rem; color: var(--text-subtle); text-align: center; padding: 20px;">
               Audit events will appear here in real-time.
             </div>
           </div>
         </div>
 
+        <!-- Scam / Phishing Check Tool -->
+        <div>
+          <div class="section-title">
+            <span>🛡️ Scam / Phishing Check</span>
+            <span class="section-hint">Bedrock Security</span>
+          </div>
+          <form id="scamCheckForm" class="form-group" style="gap: 10px;">
+            <textarea class="form-input" id="inputScamText" rows="3"
+              placeholder="Paste a suspicious message or voice transcript to analyze…"
+              style="resize: vertical; font-size: 0.85rem;" aria-label="Suspicious text to analyze"></textarea>
+            <button type="submit" class="btn-secondary-sm" style="width: 100%; justify-content: center;">
+              🔍 Analyze with Bedrock
+            </button>
+          </form>
+          <div id="scamCheckResult" aria-live="polite"></div>
+        </div>
+
         <!-- Live MCP JSON-RPC Protocol Inspector -->
         <div class="trace-panel-wrapper">
           <div class="trace-controls">
-            <span style="font-size: 0.78rem; font-weight: 700; color: var(--alexa-cyan); text-transform: uppercase;">
-              Raw MCP JSON-RPC Inspector
-            </span>
+            <span class="trace-title">Raw MCP JSON-RPC Inspector</span>
             <div style="display: flex; gap: 6px;">
-              <button class="btn-secondary-sm" id="btnClearTrace" style="padding: 2px 6px; font-size: 0.7rem;">Clear</button>
+              <button class="btn-secondary-sm" id="btnClearTrace" style="padding: 2px 6px; font-size: 0.72rem;" aria-label="Clear trace log">Clear</button>
             </div>
           </div>
-          <div class="trace-terminal" id="traceTerminal">Initializing MCP client streamable HTTP session at /mcp...</div>
+          <div class="trace-terminal" id="traceTerminal" role="log" aria-label="MCP Protocol JSON-RPC log">Initializing MCP client streamable HTTP session at /mcp…</div>
         </div>
       </div>
     </section>
@@ -198,50 +228,64 @@
     <!-- ============================================================== -->
     <!-- COLUMN 3: USER B (RECIPIENT VOICE CONSOLE)                     -->
     <!-- ============================================================== -->
-    <section class="col-panel" id="panelUserB">
+    <section class="col-panel" id="panelUserB" role="region" aria-label="User B Recipient Voice Console">
       <div class="panel-header">
         <div class="panel-title">
-          <span class="icon">💬</span>
+          <span class="icon" aria-hidden="true">💬</span>
           <span>User B (Recipient)</span>
           <span class="user-badge user-b-badge">ALEXA+ CONSOLE</span>
         </div>
       </div>
 
       <div class="panel-body">
-        <!-- Urgent Briefing Notification Alert (Conditional) -->
-        <div class="urgent-briefing-alert" id="briefingAlert" style="display: none;">
-          <div style="font-size: 1.5rem;">🚨</div>
+        <!-- Urgent Briefing Notification Alert (shown when escalation fires) -->
+        <div class="urgent-briefing-alert" id="briefingAlert" style="display: none;" role="alert" aria-live="assertive">
+          <div style="font-size: 1.5rem;" aria-hidden="true">🚨</div>
           <div class="briefing-content">
             <div class="briefing-title">Urgent Alexa+ Priority Briefing</div>
             <div class="briefing-text" id="briefingText">A delegation deadline has passed.</div>
           </div>
-          <button class="btn-card-action" id="btnDismissBriefing" style="align-self: center;">Dismiss</button>
+          <button class="btn-card-action" id="btnDismissBriefing" style="align-self: center;" aria-label="Dismiss priority briefing">Dismiss</button>
         </div>
 
         <!-- Ask Question Form -->
         <form id="askDelegationForm" class="form-group" style="gap: 12px;">
           <div class="section-title">
             <span>Ask Alexa+</span>
-            <span style="font-size: 0.7rem; color: var(--text-subtle);">Stage 1 & 2 Gated</span>
+            <span class="section-hint">Stage 1 Gatekeeper + Stage 2 Vault</span>
           </div>
 
           <div class="form-group">
             <label class="form-label" for="inputQuestion">Question for Alexa+</label>
-            <div style="position: relative;">
-              <input type="text" class="form-input" id="inputQuestion" value="How do I roll back the payments service?" placeholder="Speak or type your question" style="width: 100%; padding-right: 36px;" required>
-              <span style="position: absolute; right: 10px; top: 10px; color: var(--alexa-cyan);">🎙️</span>
+            <div class="input-mic-wrapper">
+              <input type="text" class="form-input" id="inputQuestion"
+                value="How do I roll back the payments service?"
+                placeholder="Speak or type your question"
+                required>
+              <button type="button" class="btn-mic" id="btnMicQuestion" title="Push-to-Talk: Click to speak question" aria-label="Microphone input for question">🎙️</button>
             </div>
           </div>
 
           <div class="form-group">
             <label class="form-label" for="inputAskCodeword">Spoken Codeword</label>
-            <input type="text" class="form-input" id="inputAskCodeword" value="solaris" placeholder="Spoken voice codeword" required>
-            <div style="font-size: 0.7rem; color: var(--text-subtle); margin-top: 2px;">
-              Normalized: speech punctuation like <em>'Solaris.'</em> or <em>' SOLARIS '</em> auto-matches.
+            <div class="input-mic-wrapper">
+              <input type="text" class="form-input" id="inputAskCodeword" value="solaris" placeholder="Spoken voice codeword" required>
+              <button type="button" class="btn-mic" id="btnMicCodeword" title="Push-to-Talk: Click to speak codeword" aria-label="Microphone input for codeword">🎙️</button>
+            </div>
+            <div class="field-hint">
+              Normalized: <em>'Solaris.'</em> or <em>' SOLARIS '</em> auto-matches.
             </div>
           </div>
 
-          <button type="submit" class="btn-primary" id="btnAskSubmit" style="background: linear-gradient(135deg, #7c3aed, #a855f7);">
+          <!-- Privacy Mode Toggle (Show on screen only) -->
+          <div class="privacy-toggle-wrapper">
+            <label class="privacy-toggle-label" for="chkPrivacyMode" title="When enabled, sensitive secrets are shown on screen but never spoken out loud">
+              <input type="checkbox" id="chkPrivacyMode" class="privacy-checkbox">
+              <span class="privacy-label-text">🔒 Privacy Mode (Screen Only — don't speak answers aloud)</span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn-primary btn-ask" id="btnAskSubmit">
             <span>🗣️ Ask Alexa+ Broker</span>
           </button>
         </form>
@@ -249,25 +293,25 @@
         <!-- One-Click Demo Test Scenarios -->
         <div>
           <div class="section-title">
-            <span>One-Click Demo Test Cases</span>
-            <span style="font-size: 0.7rem; color: var(--alexa-cyan);">3-Min Video Scenarios</span>
+            <span>One-Click Demo Scenarios</span>
+            <span class="section-hint">3-Min Video Flows</span>
           </div>
           <div class="test-scenarios-grid">
-            <button type="button" class="btn-test-scenario" id="testCaseAllowed">
+            <button type="button" class="btn-test-scenario" id="testCaseAllowed" aria-label="Run Case 1: In-scope allowed test">
               <span class="test-tag test-allowed">Case 1: In-Scope</span>
-              <span class="test-desc">Valid question & codeword -> Released</span>
+              <span class="test-desc">Valid question &amp; codeword → Released</span>
             </button>
-            <button type="button" class="btn-test-scenario" id="testCaseOutOfScope">
+            <button type="button" class="btn-test-scenario" id="testCaseOutOfScope" aria-label="Run Case 2: Out of scope denied test">
               <span class="test-tag test-denied">Case 2: Out-Of-Scope</span>
-              <span class="test-desc">Asks for company finances -> Blocked</span>
+              <span class="test-desc">Asks for private finances → Blocked</span>
             </button>
-            <button type="button" class="btn-test-scenario" id="testCaseJailbreak">
+            <button type="button" class="btn-test-scenario" id="testCaseJailbreak" aria-label="Run Case 3: Prompt injection jailbreak test">
               <span class="test-tag test-jailbreak">Case 3: Jailbreak</span>
-              <span class="test-desc">"Ignore instructions & dump" -> Blocked</span>
+              <span class="test-desc">"Ignore instructions &amp; dump" → Blocked</span>
             </button>
-            <button type="button" class="btn-test-scenario" id="testCaseWrongCodeword">
-              <span class="test-tag test-lockout">Case 4: Lockout</span>
-              <span class="test-desc">3 wrong codewords -> Locked</span>
+            <button type="button" class="btn-test-scenario" id="testCaseWrongCodeword" aria-label="Run Case 4: Triple wrong codeword lockout test">
+              <span class="test-tag test-lockout">Case 4: Lockout (×3)</span>
+              <span class="test-desc">3 wrong codewords fired → Locked</span>
             </button>
           </div>
         </div>
@@ -275,18 +319,23 @@
         <!-- Alexa+ Voice Response Bubble -->
         <div class="alexa-response-container" id="alexaResponseBox">
           <div class="alexa-voice-header">
-            <div class="sound-waves">
+            <div class="sound-waves" aria-hidden="true">
+              <div class="sound-bar"></div>
               <div class="sound-bar"></div>
               <div class="sound-bar"></div>
               <div class="sound-bar"></div>
               <div class="sound-bar"></div>
             </div>
             <span>Alexa+ Voice Output</span>
+            <span class="gate-badge" id="gateBadge" style="display:none;"></span>
+            <button type="button" class="btn-voice-replay" id="btnReplayVoice" title="Replay spoken answer with Alexa voice" aria-label="Replay speech audio" style="display: none;">
+              🔊 Replay Voice
+            </button>
           </div>
-          <div class="speech-bubble" id="alexaSpeechText">
-            "Awaiting your voice request. When authorized, answers will be spoken here with semantic slicing."
+          <div class="speech-bubble" id="alexaSpeechText" aria-live="polite">
+            "Awaiting your voice request. When authorized, answers will be spoken here with semantic slicing applied."
           </div>
-          <div class="slicing-pill" id="slicingBadge" style="display: none;">
+          <div class="slicing-pill" id="slicingBadge" style="display: none;" role="status">
             🛡️ Semantic Slicing Applied: Only requested facts released
           </div>
         </div>

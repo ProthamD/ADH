@@ -48,7 +48,7 @@
 - **Actual:** Anyio TaskGroup propagates internal termination notifications if session closure is not awaited gracefully before terminating the transport stream.
 - **Severity:** Medium.
 - **Workaround:**
-  Structured helper `call_mcp_tool_direct` to cleanly manage the dual context managers and properly suppress normal session disconnection teardown signals.
+  Structured helper `execute_via_mcp_client` to cleanly manage the dual context managers and properly suppress normal session disconnection teardown signals.
 - **Suggestion for SDK Maintainers:**
   Provide a high-level helper `execute_mcp_tool(url, tool_name, arguments)` that wraps session lifecycle and cleanup in one function.
 
@@ -85,3 +85,25 @@
   2. Verified fail-closed security: when IAM permissions (`bedrock:InvokeModel`) are pending or missing, the Stage 1 Gatekeeper gracefully fails closed (returns `DENY` with full audit trace), preventing any authorization leaks.
 - **Suggestion for AWS / Bedrock:**
   Provide automatic alias redirection (e.g. `anthropic.claude-haiku-latest` or `amazon.nova-micro-default`) so applications do not break abruptly when pinned minor model date snapshots reach retirement.
+
+---
+
+### Entry 6: FastAPI `app.mount()` Does Not Trigger Mounted Sub-App Lifespan (MCP Streamable HTTP)
+- **Date & Timestamp:** 2026-10-22T12:45:00Z
+- **Component / Tool:** `mcp.server.mcpserver` & `fastapi`
+- **Task:** Serving MCP Streamable HTTP session manager alongside FastAPI application routes.
+- **Steps Taken:**
+  1. Mounted the MCP Starlette sub-app via `app.mount("/mcp", mcp_starlette_app)`.
+  2. Sent JSON-RPC initialize request to `POST /mcp` and `POST /mcp/`.
+- **Expected:** MCP Streamable HTTP handles session initialization and tool negotiation.
+- **Actual:** 
+  1. `POST /mcp` returned HTTP 405 (method not allowed) because FastAPI's root static mount intercepted requests without a trailing slash.
+  2. `POST /mcp/` returned HTTP 500: `RuntimeError: Task group is not initialized. Make sure to use run()`. FastAPI does not invoke the lifespan context of mounted sub-applications, leaving the MCP session manager uninitialized.
+- **Severity:** High (Blocked MCP client connections).
+- **Workaround:**
+  1. Configured `mcp.streamable_http_app(streamable_http_path="/mcp", stateless_http=True)`.
+  2. Nested `async with mcp_starlette_app.router.lifespan_context(mcp_starlette_app):` inside FastAPI's lifespan manager.
+  3. Replaced `app.mount("/mcp", ...)` with `app.router.routes.extend(mcp_starlette_app.routes)` placed before the root static files mount.
+- **Suggestion for SDK Maintainers:**
+  Document the exact integration recipe for embedding `MCPServer.streamable_http_app` inside existing FastAPI applications, and warn about sub-app lifespan isolation.
+

@@ -2,13 +2,38 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 
 # Environment and secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+credentials.json
+token.json
+
+# Local databases and runtime state
 *.db
+*.db-journal
+*.sqlite
 *.sqlite3
+delegation_broker.db
+
+# S3 local simulation staging
+infra/s3_staging/
+s3_staging/
+
+# Log files & tunnels
+*.log
+cloudflared*
+ngrok*
 
 # Pytest & IDE
 .pytest_cache/
 .vscode/
 .idea/
+.agents/
+.gemini/

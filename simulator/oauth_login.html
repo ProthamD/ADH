@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alexa+ Delegation Broker — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0d1a;
+      --surface: #111827;
+      --border: #1f2937;
+      --accent-blue: #00c6ff;
+      --accent-purple: #7c3aed;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --text-main: #f0f4ff;
+      --text-sub: #94a3b8;
+      --owner-color: #7c3aed;
+      --recipient-color: #00c6ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background-image:
+        radial-gradient(ellipse 60% 40% at 30% 20%, rgba(124,58,237,0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 35% at 70% 80%, rgba(0,198,255,0.06) 0%, transparent 70%);
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .logo-text { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.02em; }
+    .logo-sub { font-size: 0.72rem; color: var(--text-sub); margin-top: 2px; }
+    h1 { font-size: 1.35rem; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.02em; }
+    .subtitle { font-size: 0.83rem; color: var(--text-sub); margin-bottom: 28px; line-height: 1.5; }
+    .client-badge {
+      background: rgba(124,58,237,0.1);
+      border: 1px solid rgba(124,58,237,0.25);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      color: #a78bfa;
+      margin-bottom: 24px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .role-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .role-btn {
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 10px;
+      background: transparent;
+      color: var(--text-sub);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+    }
+    .role-btn:hover { border-color: rgba(124,58,237,0.5); color: var(--text-main); }
+    .role-btn.selected-owner {
+      border-color: var(--owner-color);
+      background: rgba(124,58,237,0.1);
+      color: #c4b5fd;
+    }
+    .role-btn.selected-recipient {
+      border-color: var(--recipient-color);
+      background: rgba(0,198,255,0.1);
+      color: #7dd3fc;
+    }
+    .role-icon { font-size: 1.4rem; display: block; margin-bottom: 6px; }
+    .role-label { font-weight: 600; font-size: 0.85rem; }
+    .role-desc { font-size: 0.7rem; color: var(--text-sub); margin-top: 2px; }
+    label { font-size: 0.78rem; font-weight: 500; color: var(--text-sub); display: block; margin-bottom: 6px; }
+    input {
+      width: 100%;
+      background: #0d111f;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 16px;
+    }
+    input:focus { border-color: var(--accent-purple); }
+    .btn-submit {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--accent-purple), #5b21b6);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 0.92rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 4px;
+    }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.35); }
+    .scopes-box {
+      background: rgba(16,185,129,0.06);
+      border: 1px solid rgba(16,185,129,0.2);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+    }
+    .scopes-title { font-size: 0.72rem; color: var(--accent-green); font-weight: 600; margin-bottom: 8px; }
+    .scope-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.76rem; color: var(--text-sub); margin-bottom: 4px;
+    }
+    .scope-item:last-child { margin-bottom: 0; }
+    .scope-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); flex-shrink: 0; }
+    .error-box {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      color: #fca5a5;
+      margin-bottom: 16px;
+    }
+    .security-note {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      text-align: center;
+      margin-top: 18px;
+      line-height: 1.5;
+    }
+    .security-note span { color: #a78bfa; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-row">
+      <div class="logo-icon">🔐</div>
+      <div>
+        <div class="logo-text">Alexa+ Delegation Broker</div>
+        <div class="logo-sub">MCP Server — Account Linking</div>
+      </div>
+    </div>
+
+    <h1>Connect to Alexa+</h1>
+    <p class="subtitle">Sign in to link your role with Alexa+. Choose whether you are the <strong>owner</strong> who creates delegations, or the <strong>recipient</strong> who asks questions.</p>
+
+    <div class="client-badge">
+      🔗 Alexa+ is requesting access on behalf of: <strong id="clientNameDisplay">{{client_name}}</strong>
+    </div>
+
+    {% if error %}
+    <div class="error-box">⚠️ {{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/oauth/authorize">
+      <input type="hidden" name="client_id" value="{{client_id}}">
+      <input type="hidden" name="redirect_uri" value="{{redirect_uri}}">
+      <input type="hidden" name="state" value="{{state}}">
+      <input type="hidden" name="code_challenge" value="{{code_challenge}}">
+      <input type="hidden" name="code_challenge_method" value="{{code_challenge_method}}">
+      <input type="hidden" name="scope" value="{{scope}}">
+      <input type="hidden" name="response_type" value="code">
+
+      <div class="role-picker">
+        <button type="button" class="role-btn" id="roleOwner" onclick="selectRole('userA')">
+          <span class="role-icon">👤</span>
+          <div class="role-label">Owner (User A)</div>
+          <div class="role-desc">Creates & manages delegations</div>
+        </button>
+        <button type="button" class="role-btn" id="roleRecipient" onclick="selectRole('userB')">
+          <span class="role-icon">🎤</span>
+          <div class="role-label">Recipient (User B)</div>
+          <div class="role-desc">Asks questions via Alexa+</div>
+        </button>
+      </div>
+      <input type="hidden" name="username" id="usernameInput" value="">
+
+      <label for="passwordInput">Password</label>
+      <input type="password" id="passwordInput" name="password" placeholder="Enter your password" autocomplete="current-password" required>
+
+      <div class="scopes-box">
+        <div class="scopes-title">✅ Permissions being granted</div>
+        <div class="scope-item"><div class="scope-dot"></div>Create & manage time-locked delegations</div>
+        <div class="scope-item"><div class="scope-dot"></div>Ask questions via the Bedrock security pipeline</div>
+        <div class="scope-item"><div class="scope-dot"></div>Read audit trail & briefings</div>
+        <div class="scope-item"><div class="scope-dot"></div>Revoke delegations (owner only)</div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="signInBtn">Sign in &amp; Authorize Alexa+</button>
+    </form>
+
+    <div class="security-note">
+      🔒 This is an <span>OAuth 2.1 + PKCE</span> authorization flow.<br>
+      Your password is never sent to Alexa+ — only a short-lived Bearer token.
+    </div>
+  </div>
+
+  <script>
+    function selectRole(role) {
+      document.getElementById('usernameInput').value = role;
+      const ownerBtn = document.getElementById('roleOwner');
+      const recipientBtn = document.getElementById('roleRecipient');
+      if (role === 'userA') {
+        ownerBtn.className = 'role-btn selected-owner';
+        recipientBtn.className = 'role-btn';
+      } else {
+        ownerBtn.className = 'role-btn';
+        recipientBtn.className = 'role-btn selected-recipient';
+      }
+    }
+    // Pre-select based on scope hint or default to userB
+    const scope = "{{scope}}";
+    if (scope.includes('owner') || scope.includes('create')) {
+      selectRole('userA');
+    } else {
+      selectRole('userB');
+    }
+  </script>
+</body>
+</html>

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
 from typing import Optional
 from server.store.db import (
     get_db,
@@ -10,6 +9,7 @@ from server.store.db import (
     log_audit_event,
     create_pending_briefing,
     fast_forward_delegation_time,
+    purge_delegation_payload,
 )
 from server.notify.webhook import send_escalation_webhook
 
@@ -49,6 +49,7 @@ class DelegationScheduler:
     async def tick(self):
         """
         Executes one evaluation cycle across all active delegations.
+        P0-6: Each row is wrapped in try/except so one bad row never stops others.
         """
         conn = get_db()
         cur = conn.cursor()
@@ -56,58 +57,96 @@ class DelegationScheduler:
         active_delegations = [dict(r) for r in cur.fetchall()]
         conn.close()
 
-        current_time = datetime.now(timezone.utc)
+        current_time = now()
 
         for d in active_delegations:
-            expires_at = parse_iso(d["expires_at"])
-            if current_time >= expires_at:
-                delegation_id = d["id"]
-                recipient = d["recipient"]
-                topic_desc = d["topic_desc"]
-                uses = d["uses"]
-                escalate_to = d.get("escalate_to")
+            try:
+                self._process_delegation(d, current_time)
+            except Exception as e:
+                logger.error(
+                    f"Scheduler error processing delegation {d.get('id', '?')}: {e}",
+                    exc_info=True,
+                )
 
-                logger.info(f"Delegation {delegation_id} has expired (uses: {uses}). Transitioning state.")
-                update_delegation_status(delegation_id, "expired")
+    def _process_delegation(self, d: dict, current_time) -> None:
+        """P0-6: Wrapped per-row processing so exceptions don't abort the scan."""
+        expires_at_str = d.get("expires_at")
+        if not expires_at_str:
+            return
 
-                if uses == 0:
-                    # Time-locked push escalation: deadline missed without any check-in
-                    log_audit_event(
-                        actor="system",
-                        action="escalated",
-                        delegation_id=delegation_id,
-                        note=f"Deadline missed with 0 uses. Multi-channel escalation triggered for {recipient}.",
-                    )
-                    # 1. Queue high-priority briefing for User B's next Alexa+ session
-                    briefing_msg = (
-                        f"Priority Briefing: An authorized delegation regarding '{topic_desc}' "
-                        f"expired before you checked in. Please connect with your administrator."
-                    )
-                    create_pending_briefing(
-                        delegation_id=delegation_id,
-                        recipient=recipient,
-                        message=briefing_msg,
-                        priority="high",
-                    )
-                    # 2. Fire out-of-band webhook
-                    await send_escalation_webhook(
+        expires_at = parse_iso(expires_at_str)
+        if current_time < expires_at:
+            return
+
+        delegation_id = d["id"]
+        recipient = d["recipient"]
+        topic_desc = d["topic_desc"]
+        uses = d["uses"]
+        escalate_to = d.get("escalate_to")
+
+        logger.info(f"Delegation {delegation_id} expired (uses: {uses}). Transitioning state.")
+        update_delegation_status(delegation_id, "expired")
+        purge_delegation_payload(delegation_id)  # F0: ephemeral purge on expiry
+
+        if uses == 0:
+            # Deadline missed without any check-in — escalate
+            log_audit_event(
+                actor="system",
+                action="escalated",
+                delegation_id=delegation_id,
+                note=f"Deadline missed with 0 uses. Multi-channel escalation triggered for {recipient}.",
+            )
+            # Queue high-priority briefing for User B's next session
+            briefing_msg = (
+                f"Priority Briefing: An authorized delegation regarding '{topic_desc}' "
+                f"expired before you checked in. Please connect with your administrator."
+            )
+            create_pending_briefing(
+                delegation_id=delegation_id,
+                recipient=recipient,
+                message=briefing_msg,
+                priority="high",
+            )
+            # Fire multi-channel escalation: Webhook + AWS Lambda serverless execution
+            asyncio.create_task(
+                send_escalation_webhook(
+                    delegation_id=delegation_id,
+                    recipient=recipient,
+                    topic_desc=topic_desc,
+                    target_url=escalate_to,
+                )
+            )
+            try:
+                from server.aws.lambda_escalation import dispatch_lambda_escalation
+                asyncio.create_task(
+                    dispatch_lambda_escalation(
                         delegation_id=delegation_id,
                         recipient=recipient,
                         topic_desc=topic_desc,
-                        target_url=escalate_to,
+                        escalate_to=escalate_to,
                     )
-                else:
-                    log_audit_event(
-                        actor="system",
-                        action="expired",
-                        delegation_id=delegation_id,
-                        note="Delegation reached expiration time after valid access.",
-                    )
+                )
+            except Exception:
+                pass
+        else:
+            log_audit_event(
+                actor="system",
+                action="expired",
+                delegation_id=delegation_id,
+                note=f"Delegation expired after {uses} use(s). Payload purged.",
+            )
+
+        log_audit_event(
+            actor="system",
+            action="purged",
+            delegation_id=delegation_id,
+            note="Payload purged on expiration. Secret self-destructed.",
+        )
 
     async def fast_forward(self, delegation_id: str) -> bool:
         """
         Sets expiration to 1 second in the past and immediately executes a scheduler tick.
-        Runs through the exact production code path.
+        Runs through the exact production code path (DEMO_MODE only).
         """
         res = fast_forward_delegation_time(delegation_id, seconds_in_past=1)
         if res:

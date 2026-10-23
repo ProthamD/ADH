@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Alexa+ Delegation Broker Cloud Architecture (AWS Builder Challenge)
+  Provides immutable S3 audit archival, serverless Lambda escalation handler,
+  and IAM security policies.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment
+
+Resources:
+  # =========================================================================
+  # 1. AWS S3: Immutable Tamper-Evident Audit Bucket
+  # =========================================================================
+  AlexaDelegationAuditBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'alexa-delegation-vault-audit-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionOldAuditsToGlacier
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+
+  # =========================================================================
+  # 2. AWS Lambda: Out-of-Band Escalation Worker
+  # =========================================================================
+  AlexaEscalationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: alexa-delegation-escalation-handler
+      Handler: handler.lambda_handler
+      Runtime: python3.11
+      Timeout: 15
+      MemorySize: 256
+      InlineCode: |
+        import json
+        import urllib.request
+        import logging
+
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+
+        def lambda_handler(event, context):
+            logger.info("Received delegation escalation event: %s", json.dumps(event))
+            delegation_id = event.get("delegation_id", "unknown")
+            recipient = event.get("recipient", "unknown")
+            topic = event.get("topic_desc", "unknown")
+            target_url = event.get("escalate_to")
+
+            alert_text = f"🚨 [Alexa+ Escalation] Deadline passed for '{recipient}' regarding '{topic}' (ID: {delegation_id})."
+            logger.info("Escalation alert generated: %s", alert_text)
+
+            # If webhook target is present, dispatch HTTPS payload
+            if target_url and target_url.startswith("https://"):
+                try:
+                    payload = json.dumps({"text": alert_text}).encode("utf-8")
+                    req = urllib.request.Request(target_url, data=payload, headers={"Content-Type": "application/json"})
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        logger.info("Webhook dispatched with status %d", resp.status)
+                except Exception as e:
+                    logger.error("Failed to POST webhook: %s", e)
+
+            return {"statusCode": 200, "status": "escalation_processed", "delegation_id": delegation_id}
+
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+
+  # =========================================================================
+  # 4. Amazon SNS: High-Severity Threat & Escalation Topic
+  # =========================================================================
+  AlexaDelegationAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: alexa-delegation-security-alerts
+      DisplayName: Alexa+ Delegation Broker Threat Alerts
+
+  # =========================================================================
+  # 5. AWS IAM Role: Alexa+ Delegation Broker Host Permissions
+  # =========================================================================
+  AlexaDelegationHostRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'AlexaDelegationBrokerRole-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+                - ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AlexaDelegationHostPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: !Sub 'arn:aws:s3:::${AlexaDelegationAuditBucket}/*'
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt AlexaEscalationFunction.Arn
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref AlexaDelegationAlertsTopic
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:Converse
+                Resource:
+                  - 'arn:aws:bedrock:*:*:foundation-model/amazon.nova-micro-v1:0'
+                  - 'arn:aws:bedrock:*:*:foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0'
+
+Outputs:
+  AuditBucketArn:
+    Description: ARN of the S3 Audit Bucket
+    Value: !GetAtt AlexaDelegationAuditBucket.Arn
+  EscalationFunctionArn:
+    Description: ARN of the Lambda Escalation Handler
+    Value: !GetAtt AlexaEscalationFunction.Arn
+  SecurityAlertsTopicArn:
+    Description: ARN of the SNS Threat Alerts Topic
+    Value: !Ref AlexaDelegationAlertsTopic
+
