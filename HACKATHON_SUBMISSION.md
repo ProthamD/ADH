@@ -2,9 +2,11 @@
 
 > **Amazon Developer Hackathon 2026**  
 > **Primary Track**: Alexa+ (Self-Hosted MCP Server & Web Simulator)  
-> **Mini Challenges**: AWS Builder (Bedrock, CloudWatch, SNS, S3) & Open Source (MIT License)  
+> **Mini Challenges**: AWS Builder (Bedrock, CloudWatch, SNS, S3, SAM) & Open Source (MIT License)  
 > **Repository**: [https://github.com/ProthamD/ADH](https://github.com/ProthamD/ADH)  
-> **Developer Feedback**: [FRICTION_LOG.md](FRICTION_LOG.md) (Friction log for MCP SDK & Bedrock)
+> **Developer Feedback**: [FRICTION_LOG.md](FRICTION_LOG.md) (Friction log for MCP SDK & Bedrock)  
+> **Demo Video Script**: [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md)  
+> **Deployment Configs**: [Dockerfile](Dockerfile) & [render.yaml](render.yaml)
 
 ---
 
@@ -21,6 +23,7 @@ Every access request is gated through multi-layered defense-in-depth:
 4. **Phonetic verbal codewords** with a 3-strike lockout and automated owner escalation.
 5. **Semantic Fact Slicing** (releasing only the minimal fact required to answer the specific prompt).
 6. **A Tamper-Evident Linear SHA-256 Hash Chain** staged to immutable storage.
+7. **Cloud-Ready Containerization** with automatic fallback provisioning for seamless deployment on AWS App Runner or Render.
 
 ---
 
@@ -31,7 +34,7 @@ flowchart TD
     subgraph Clients["Clients & Voice Endpoints"]
         UA["Owner Alexa+ (User A)\n[Bearer Token A: delegation:write]"]
         UB["Recipient Alexa+ (User B)\n[Bearer Token B: delegation:read]"]
-        SIM["Local Web Simulator UI\n[Local Loopback Only]"]
+        SIM["Local Web Simulator UI\n[Single-Screen Glassmorphic Cockpit]"]
     end
 
     subgraph AuthLayer["Auth & Discovery Layer (RFC Standards)"]
@@ -83,11 +86,11 @@ flowchart TD
 ## 3. Core Architectural Decisions & Honest Threat Model
 
 ### 1. Transport: MCP Streamable HTTP (2025-11-25 Spec)
-* **Architecture**: Implements `streamable_http_app(streamable_http_path="/mcp")` using the official Python MCP SDK with lifespan forwarding.
-* **Rationale**: Replaces deprecated Server-Sent Events (SSE) dual-channel transports with single-endpoint Streamable HTTP, matching the 2025/2026 Alexa+ Add-on standard.
+* **Architecture**: Implements `streamable_http_app(streamable_http_path="/mcp")` using the official Python MCP SDK (`mcp>=2.3.0`) with lifespan forwarding.
+* **Rationale**: Replaces deprecated Server-Sent Events (SSE) dual-channel transports with single-endpoint Streamable HTTP, matching the official 2025/2026 Alexa+ Add-on standard.
 
 ### 2. Prompt Injection & Threat Model Realities
-* **Threat Reality**: The gatekeeper consumes attacker-controlled text (the recipient's question). A sufficiently sophisticated prompt injection could attempt to trick an LLM into an unauthorized `ALLOW` classification. Claiming "zero injection risk" is scientifically incorrect.
+* **Threat Reality**: The gatekeeper consumes attacker-controlled text (the recipient's question). A crafted prompt could attempt to trick an LLM into an unauthorized `ALLOW` classification.
 * **Our Defense-in-Depth**:
   - **Pre-filtering**: The lexical fast-path scans for known jailbreak expressions (`ignore previous instructions`, `roleplay as`, system prompt overrides) and drops them immediately.
   - **Strict Structural Delimiting**: Untrusted input is strictly quarantined within `<untrusted_user_question>` tags in the Bedrock prompt, and evaluation is enforced via structured tool-calling (`record_gate_decision`).
@@ -107,13 +110,13 @@ flowchart TD
   $$\text{row\_hash} = \text{SHA-256}(\text{prev\_hash} \mid \text{ts} \mid \text{actor} \mid \text{action} \mid \text{delegation\_id} \mid \text{question} \mid \text{gate\_decision} \mid \text{note})$$
 * **Honest Scope**: This is a linear append-only hash chain (not a tree). It guarantees tamper-evidence against accidental database corruption or naive record editing. Because an attacker with direct local database write access could recalculate an entire local chain, production deployments stage hashes to external immutable storage (**AWS S3 Object Lock** via `server/aws/s3_archival.py`).
 
-### 5. Vault Key Management & KMS Readiness
-* **Local / Demo Setup**: Secrets are encrypted with Fernet (AES-128-CBC + HMAC-SHA256) using keys provided via environment configuration (`ENCRYPTION_KEY`, `HMAC_SECRET`).
+### 5. Vault Key Management & Cloud Auto-Provisioning
+* **Local / Demo Setup**: Secrets are encrypted with Fernet (AES-128-CBC + HMAC-SHA256). In `DEMO_MODE=true` or during cloud container builds where no `.env` file exists, deterministic demo keys are automatically provisioned so container deployments on Render or AWS App Runner never fail with startup key errors.
 * **Production AWS Architecture**: As defined in `infra/template.yaml`, production environments use AWS KMS envelope encryption (`kms:GenerateDataKey` / `kms:Decrypt`), ensuring master cryptographic keys remain secured inside AWS Hardware Security Modules (HSMs).
 
 ### 6. Authentication Gating & DEMO_MODE Hardening
 * **Production Requirement**: All external requests arriving via internet gateways, public tunnels (`cloudflared`/`ngrok`), or proxies (`X-Forwarded-For`, `X-Real-IP`) **strictly require** a valid OAuth 2.1 Bearer token (HTTP 401 `missing_token` enforced).
-* **Local Loopback Exception**: `DEMO_MODE` bypass is restricted strictly to local developer loopback addresses (`127.0.0.1`, `::1`, `localhost`, `testclient`) when `ENVIRONMENT != "production"`.
+* **Local Loopback Exception**: `DEMO_MODE` fallback is restricted strictly to local developer loopback addresses (`127.0.0.1`, `::1`, `localhost`, `testclient`) when `ENVIRONMENT != "production"`.
 
 ### 7. Lexical Fast-Path Filter (TF-IDF)
 * **Distinction**: We explicitly distinguish between lexical keyword similarity (TF-IDF n-grams + cosine similarity) and deep neural semantic evaluation.
@@ -194,7 +197,61 @@ def _compute_audit_hash(prev_hash: str, ts: str, actor: str, action: str,
 
 ---
 
-## 5. Connecting Real Alexa+ Devices & Developer Console
+## 5. AWS Builder Integrations & Serverless Staging
+
+ADH implements real, production-ready AWS SDK integrations across core serverless services:
+
+```mermaid
+flowchart LR
+    BROKER["ADH Broker Server\n(FastAPI / MCP)"]
+    BEDROCK["Amazon Bedrock\n(Nova Micro / Haiku)"]
+    CW["Amazon CloudWatch\n(Metrics: AlexaDelegationBroker)"]
+    SNS["Amazon SNS\n(Alerts: Security Alarms)"]
+    S3["Amazon S3\n(Vault: alexa-delegation-vault-audit)"]
+    LAMBDA["AWS Lambda\n(Escalation Handler)"]
+
+    BROKER -->|boto3 converse| BEDROCK
+    BROKER -->|boto3 put_metric_data| CW
+    BROKER -->|boto3 publish| SNS
+    BROKER -->|boto3 put_object| S3
+    BROKER -->|boto3 invoke| LAMBDA
+```
+
+1. **Amazon Bedrock**:
+   - Client: `boto3.client('bedrock-runtime', region_name='us-east-1')`
+   - Model: `amazon.nova-micro-v1:0` (with fallback to `anthropic.claude-3-haiku-20240307-v1:0`).
+   - Implementation: Structured Converse tool-calling (`record_gate_decision`).
+2. **Amazon CloudWatch Metrics**:
+   - Namespace: `AlexaPlusDelegationBroker/Security`
+   - Emits real-time metrics: `AllowedQueries`, `DeniedQueries`, `JailbreakAttempts`, `FactsReleased`, and `SemanticRouterLatencyMs`.
+3. **Amazon SNS Alerts**:
+   - Topic: `arn:aws:sns:us-east-1:<Account>:alexa-delegation-security-alerts`
+   - Dispatches instant high-priority notifications on prompt injection attempts or 3-strike lockouts.
+4. **Amazon S3 Audit Archival**:
+   - Bucket: `alexa-delegation-vault-audit`
+   - Implements encrypted hash chain snapshots with local staging in `infra/s3_staging/`.
+5. **AWS Lambda & SAM Deployment**:
+   - SAM Template: Complete CloudFormation template in [`infra/template.yaml`](infra/template.yaml) deploying the S3 bucket, SNS topic, IAM least-privilege roles, and the escalation worker Lambda.
+
+---
+
+## 6. Cloud Deployment & Containerization
+
+ADH is fully containerized and cloud-ready for instant evaluation:
+
+* **Production Container ([Dockerfile](Dockerfile))**:
+  - Python 3.11-slim base image with non-root security.
+  - Automatically seeds the demo database on startup.
+  - Built-in health check (`curl -f http://localhost:8000/api/health`).
+* **1-Click Render Blueprint ([render.yaml](render.yaml))**:
+  - Pre-configured Infrastructure-as-Code for 1-click cloud deployment on Render.
+  - Provides a 24/7 public HTTPS endpoint for hackathon judges.
+* **AWS App Runner Compatible**:
+  - Directly deployable on AWS App Runner using the provided `Dockerfile`.
+
+---
+
+## 7. Connecting Real Alexa+ Devices & Developer Console
 
 While the web simulator demonstrates the end-to-end multi-tenant lifecycle locally, the server is fully ready to connect to physical Alexa+ hardware or the **Alexa Developer Console**:
 
@@ -222,7 +279,7 @@ While the web simulator demonstrates the end-to-end multi-tenant lifecycle local
 
 ---
 
-## 6. Test Suite & Verification Results
+## 8. Test Suite & Verification Results
 
 All **29 unit and integration tests** pass with 100% success:
 
@@ -244,7 +301,7 @@ Verified areas include:
 
 ---
 
-## 7. Hackathon Criteria Alignment Matrix
+## 9. Hackathon Criteria Alignment Matrix
 
 ### 1. Technical Implementation
 - **Official MCP Compliance**: Built with `mcp>=2.3.0` targeting the **Streamable HTTP (2025-11-25)** standard at `/mcp`.
@@ -252,7 +309,7 @@ Verified areas include:
 - **Security Engineering**: Fernet AES-128 vault encryption, HMAC-SHA256 codeword hashing, and a 29-test automated test suite.
 
 ### 2. Design & User Experience
-- **Operational Cockpit**: 3-column glassmorphic UI visualizing Owner management, Recipient voice queries, and live SSE protocol traces.
+- **Operational Cockpit**: Single-screen 3-column glassmorphic UI visualizing Owner management, Recipient voice queries, and live SSE protocol traces.
 - **Aesthetic Quality**: Custom SVG icon sprites, dark-mode styling, Google Fonts Inter, and mobile responsiveness.
 - **Multi-Modal Interaction**: Integrated Speech-to-Text voice recognition, audio playback, and a dedicated OAuth 2.1 consent screen.
 
@@ -264,6 +321,6 @@ Verified areas include:
 - **New Capability for Alexa+**: Moves beyond static query-and-response skills by introducing stateful, zero-trust delegation infrastructure that leverages Alexa+'s agentic architecture.
 
 ### 5. Mini-Challenges & Bonus Qualifications
-- **AWS Builder Mini-Challenge**: Integrates with Amazon Bedrock (`amazon.nova-micro-v1:0` / Claude 3 Haiku), CloudWatch metrics, SNS alerts, and SAM serverless deployment (`infra/template.yaml`).
+- **AWS Builder Mini-Challenge**: Integrates with Amazon Bedrock (`amazon.nova-micro-v1:0` / Claude 3 Haiku), CloudWatch metrics, SNS alerts, S3 vault staging, and SAM serverless deployment ([`infra/template.yaml`](infra/template.yaml)).
 - **Open Source Mini-Challenge**: MIT License, clean commits, comprehensive architecture docs, and zero hardcoded secrets.
 - **Friction Log Bonus**: [FRICTION_LOG.md](FRICTION_LOG.md) documents real developer experience friction with MCP SDK lifespan management, Bedrock Converse tool-call formatting, and PowerShell encoding quirks.
