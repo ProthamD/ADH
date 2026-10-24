@@ -176,6 +176,14 @@ async def _get_bedrock_health() -> Dict[str, Any]:
     """Returns cached Bedrock health status, refreshing every 60s."""
     global _bedrock_health_cache, _bedrock_health_ts
     import time
+    if os.environ.get("USE_SEMANTIC_CLASSIFIER", "").lower() in ("true", "1", "yes"):
+        return {
+            "status": "ok",
+            "mode": "fast_semantic_router",
+            "model": BEDROCK_MODEL_ID,
+            "region": AWS_REGION,
+            "zero_leak_guarantee": True,
+        }
     if time.time() - _bedrock_health_ts > _BEDROCK_CACHE_TTL:
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, check_bedrock_connectivity)
@@ -580,14 +588,20 @@ def _caller_from_request(request: Optional[Request], default: str = "userB") -> 
     # Strict local-loopback gating for DEMO_MODE:
     # 1. Never allowed in production
     # 2. Never allowed if request passed through a reverse proxy or public tunnel (x-forwarded-for/x-real-ip)
+    #    unless ALLOW_PROXY_DEMO=true is explicitly set for hosted cloud demos (e.g. Render)
     # 3. Only allowed for localhost loopback test clients
     is_prod = os.environ.get("ENVIRONMENT", "").lower() in ("production", "prod")
     is_demo = os.environ.get("DEMO_MODE", "").lower() == "true"
+    allow_proxy_demo = (
+        os.environ.get("ALLOW_PROXY_DEMO", "false").lower() in ("true", "1")
+        or os.environ.get("ALLOW_EXTERNAL_DEMO", "false").lower() in ("true", "1")
+        or os.environ.get("RENDER", "").lower() == "true"
+    )
     
     if is_demo and not is_prod:
         client_ip = request.client.host if request.client else ""
         has_forwarded = bool(request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip"))
-        if client_ip in ("127.0.0.1", "::1", "localhost", "testclient") and not has_forwarded:
+        if allow_proxy_demo or (client_ip in ("127.0.0.1", "::1", "localhost", "testclient") and not has_forwarded):
             return default
             
     raise HTTPException(

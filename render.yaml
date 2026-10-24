@@ -9,12 +9,14 @@ services:
     envVars:
       - key: DEMO_MODE
         value: "true"
+      - key: ALLOW_PROXY_DEMO
+        value: "true"
+      - key: USE_SEMANTIC_CLASSIFIER
+        value: "true"
       - key: ENCRYPTION_KEY
         value: "leEK-BwIZD-BoNeYgWcKg6Du-BwCIc5vebIDNYrHXHU="
       - key: HMAC_SECRET
         value: "8eff666b3a848bd842fb2abafe43a427ac08830c8e0881f2b133f9bc40722626"
-      - key: BEDROCK_MODEL_ID
-        value: "amazon.nova-micro-v1:0"
       - key: CONFIDENCE_THRESHOLD
         value: "0.75"
       - key: MAX_FACTS_PER_ANSWER

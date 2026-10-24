@@ -148,3 +148,28 @@ def test_dual_alexa_oauth_flow(temp_db):
 
     finally:
         db_mod.DB_PATH = orig
+
+
+def test_proxy_demo_gating(monkeypatch):
+    """Verifies that reverse-proxied requests require tokens unless ALLOW_PROXY_DEMO=true."""
+    client = TestClient(app)
+    
+    # 1. Proxied request without ALLOW_PROXY_DEMO -> 401 missing_token
+    monkeypatch.delenv("ALLOW_PROXY_DEMO", raising=False)
+    monkeypatch.setenv("DEMO_MODE", "true")
+    res = client.post(
+        "/api/alexa/user-b/ask",
+        headers={"X-Forwarded-For": "203.0.113.195"},
+        json={"delegation_id_or_owner": "userB", "question": "test", "codeword": "none"}
+    )
+    assert res.status_code == 401
+    assert "missing_token" in res.json()["detail"]
+
+    # 2. Proxied request WITH ALLOW_PROXY_DEMO=true -> passes auth gating (does not return 401)
+    monkeypatch.setenv("ALLOW_PROXY_DEMO", "true")
+    res2 = client.post(
+        "/api/alexa/user-b/ask",
+        headers={"X-Forwarded-For": "203.0.113.195"},
+        json={"delegation_id_or_owner": "nonexistent_id", "question": "test", "codeword": "none"}
+    )
+    assert res2.status_code != 401
