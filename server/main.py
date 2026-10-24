@@ -651,9 +651,13 @@ async def execute_via_mcp_client(tool_name: str, arguments: Dict[str, Any], requ
         )
         if allow_fallback:
             logger.warning(f"Using direct exec fallback for {tool_name} due to MCP transport error: {exc}")
-            res = _direct_exec(tool_name, arguments)
-            record_trace("DIRECT_EXEC", tool_name, arguments, result=res, error=str(exc))
-            return res
+            try:
+                res = _direct_exec(tool_name, arguments)
+                record_trace("DIRECT_EXEC", tool_name, arguments, result=res, error=str(exc))
+                return res
+            except Exception as direct_err:
+                logger.error(f"Direct exec failed for {tool_name}: {direct_err}", exc_info=True)
+                return {"status": "error", "message": f"Execution error: {direct_err}"}
         return {"status": "error", "error": f"MCP transport error: {str(exc)}", "mcp_url": mcp_url}
 
 def _direct_exec(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -721,32 +725,47 @@ class ScamCheckRequest(BaseModel):
 # =====================================================================
 @app.post("/api/alexa/user-a/create")
 async def api_create_delegation(req: CreateDelegationRequest, request: Request):
-    # Use Bearer-token caller if present (real Alexa+), else req.owner (simulator)
     caller = _caller_from_request(request, default=req.owner)
     data = req.model_dump()
     data["owner"] = caller
-    return await execute_via_mcp_client("create_delegation", data, request)
+    try:
+        return await execute_via_mcp_client("create_delegation", data, request)
+    except Exception as exc:
+        logger.error(f"api_create_delegation error: {exc}", exc_info=True)
+        return _direct_exec("create_delegation", data)
 
 @app.post("/api/alexa/user-a/audit")
 async def api_audit_log(req: AuditLogRequest, request: Request):
     caller = _caller_from_request(request, default=req.caller)
     data = req.model_dump()
     data["caller"] = caller
-    return await execute_via_mcp_client("audit_log", data, request)
+    try:
+        return await execute_via_mcp_client("audit_log", data, request)
+    except Exception as exc:
+        logger.error(f"api_audit_log error: {exc}", exc_info=True)
+        return _direct_exec("audit_log", data)
 
 @app.post("/api/alexa/user-a/revoke")
 async def api_revoke_delegation(req: RevokeDelegationRequest, request: Request):
     caller = _caller_from_request(request, default=req.caller)
     data = req.model_dump()
     data["caller"] = caller
-    return await execute_via_mcp_client("revoke_delegation", data, request)
+    try:
+        return await execute_via_mcp_client("revoke_delegation", data, request)
+    except Exception as exc:
+        logger.error(f"api_revoke_delegation error: {exc}", exc_info=True)
+        return _direct_exec("revoke_delegation", data)
 
 @app.post("/api/alexa/user-b/ask")
 async def api_ask_delegation(req: AskDelegationRequest, request: Request):
     caller = _caller_from_request(request, default=req.caller)
     data = req.model_dump()
     data["caller"] = caller
-    return await execute_via_mcp_client("ask_delegation", data, request)
+    try:
+        return await execute_via_mcp_client("ask_delegation", data, request)
+    except Exception as exc:
+        logger.error(f"api_ask_delegation error: {exc}", exc_info=True)
+        return _direct_exec("ask_delegation", data)
 
 @app.post("/api/security/check-scam")
 async def api_check_scam(req: ScamCheckRequest, request: Request):

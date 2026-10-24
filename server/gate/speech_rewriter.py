@@ -52,10 +52,16 @@ def rewrite_facts_for_speech(facts: List[Dict[str, str]]) -> str:
     Sees ONLY the already-sliced facts (never the user question or unreleased secrets).
     P0-4: Verifies all released values appear verbatim; falls back to template if not.
     """
-    if not facts:
-        return fallback_format_facts(facts)
+    has_aws_creds = bool(os.environ.get("AWS_ACCESS_KEY_ID")) and bool(os.environ.get("AWS_SECRET_ACCESS_KEY"))
+    use_bedrock = os.environ.get("USE_BEDROCK", "false").lower() in ("true", "1", "yes")
+    forced_semantic = (
+        os.environ.get("USE_SEMANTIC_CLASSIFIER", "false").lower() in ("true", "1", "yes")
+        or os.environ.get("DEMO_MODE", "").lower() == "true"
+        or not has_aws_creds
+        or not use_bedrock
+    )
 
-    if os.environ.get("USE_SEMANTIC_CLASSIFIER", "false").lower() in ("true", "1", "yes"):
+    if not facts or forced_semantic:
         return fallback_format_facts(facts)
 
     facts_summary = "\n".join([f"- {f.get('label')}: {f.get('value')}" for f in facts])

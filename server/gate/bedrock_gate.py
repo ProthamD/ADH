@@ -139,11 +139,17 @@ def classify_question(
             reasoning="Bedrock client error: fail-closed security enforcement.",
         )
 
-    # Use fast semantic router if configured or if no AWS credentials are provided
+    # Use fast semantic router if configured, in DEMO_MODE, or if Bedrock is not explicitly enabled
     has_aws_creds = bool(os.environ.get("AWS_ACCESS_KEY_ID")) and bool(os.environ.get("AWS_SECRET_ACCESS_KEY"))
-    forced_semantic = os.environ.get("USE_SEMANTIC_CLASSIFIER", "false").lower() in ("true", "1", "yes")
+    use_bedrock = os.environ.get("USE_BEDROCK", "false").lower() in ("true", "1", "yes")
+    forced_semantic = (
+        os.environ.get("USE_SEMANTIC_CLASSIFIER", "false").lower() in ("true", "1", "yes")
+        or os.environ.get("DEMO_MODE", "").lower() == "true"
+        or not has_aws_creds
+        or not use_bedrock
+    )
 
-    if forced_semantic or not has_aws_creds:
+    if forced_semantic:
         res = classify_semantically(cleaned_question, topic_desc, fact_labels, confidence_threshold)
         _record_telemetry(cleaned_question, topic_desc, res)
         return res

@@ -434,7 +434,13 @@ async function executeAskQuery(question, codeword) {
         caller: "userB"
       })
     });
-    const data = await res.json();
+    const rawText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (_) {
+      data = { status: "error", message: rawText || `HTTP ${res.status}` };
+    }
 
     responseBox.classList.remove("response-thinking");
     if (soundWaves) soundWaves.classList.remove("waves-active");
