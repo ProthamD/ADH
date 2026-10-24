@@ -613,15 +613,21 @@ def _caller_from_request(request: Optional[Request], default: str = "userB") -> 
 # MCP Bridge (calls real /mcp endpoint via official Python client)
 # =====================================================================
 def _get_base_url(request: Optional[Request] = None) -> str:
-    """P0-1: Derive BASE_URL from the actual server port, not env defaults."""
+    """P0-1: Derive loopback BASE_URL for internal MCP bridge calls."""
+    actual_port = os.environ.get("PORT") or (request.url.port if request else None) or PORT
     if request:
+        # Avoid public hairpin loops over reverse proxies (e.g. onrender.com)
+        has_forwarded = bool(request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip"))
+        host = request.headers.get("host", "")
+        if has_forwarded or "onrender.com" in host:
+            return f"http://127.0.0.1:{actual_port}"
         return str(request.base_url).rstrip("/")
-    return f"http://{HOST}:{PORT}"
+    return f"http://127.0.0.1:{actual_port}"
 
 async def execute_via_mcp_client(tool_name: str, arguments: Dict[str, Any], request: Optional[Request] = None) -> Dict[str, Any]:
     """
     Calls the local /mcp endpoint using the official MCP Python client over Streamable HTTP.
-    P0-1: No silent DIRECT_EXEC fallback — returns visible error if MCP is unreachable.
+    Falls back gracefully to direct handler execution in DEMO_MODE or when ALLOW_DIRECT_FALLBACK=true.
     """
     base_url = _get_base_url(request)
     mcp_url = f"{base_url}/mcp"
@@ -638,10 +644,13 @@ async def execute_via_mcp_client(tool_name: str, arguments: Dict[str, Any], requ
     except Exception as exc:
         logger.error(f"MCP client call failed for {tool_name}: {exc}")
         record_trace("ERROR", tool_name, arguments, error=str(exc))
-        # Show clear error in UI — no silent fallback (P0-1)
-        # For demo resilience only: allow DIRECT_EXEC when ALLOW_DIRECT_FALLBACK=true
-        if os.environ.get("ALLOW_DIRECT_FALLBACK", "false").lower() in ("true", "1"):
-            logger.warning(f"ALLOW_DIRECT_FALLBACK=true, using direct exec for {tool_name}")
+        # For demo resilience: allow DIRECT_EXEC when ALLOW_DIRECT_FALLBACK=true or in DEMO_MODE
+        allow_fallback = (
+            os.environ.get("ALLOW_DIRECT_FALLBACK", "false").lower() in ("true", "1")
+            or DEMO_MODE
+        )
+        if allow_fallback:
+            logger.warning(f"Using direct exec fallback for {tool_name} due to MCP transport error: {exc}")
             res = _direct_exec(tool_name, arguments)
             record_trace("DIRECT_EXEC", tool_name, arguments, result=res, error=str(exc))
             return res

@@ -11,6 +11,8 @@ services:
         value: "true"
       - key: ALLOW_PROXY_DEMO
         value: "true"
+      - key: ALLOW_DIRECT_FALLBACK
+        value: "true"
       - key: USE_SEMANTIC_CLASSIFIER
         value: "true"
       - key: ENCRYPTION_KEY
