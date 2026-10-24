@@ -11,9 +11,13 @@ import math
 import logging
 from dataclasses import dataclass
 from typing import List, Dict, Any, Tuple, Optional
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+try:
+    import numpy as np
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    HAS_SKLEARN = True
+except ImportError:
+    HAS_SKLEARN = False
 
 logger = logging.getLogger(__name__)
 
@@ -164,33 +168,37 @@ class FastSemanticRouter:
         # Prepare corpus: [Question, Topic Description, Fact Label 1, Fact Label 2, ...]
         corpus = [cleaned_question, topic_desc] + fact_labels
 
-        try:
-            vectorizer = TfidfVectorizer(
-                ngram_range=(1, 3),
-                analyzer="word",
-                stop_words="english",
-                token_pattern=r"(?u)\b[\w-]+\b",
-            )
-            tfidf_matrix = vectorizer.fit_transform(corpus)
-            question_vec = tfidf_matrix[0:1]
-            topic_vec = tfidf_matrix[1:2]
-            label_vecs = tfidf_matrix[2:]
+        sim_topic = 0.0
+        sim_labels: List[Tuple[str, float]] = [(lbl, 0.0) for lbl in fact_labels]
 
-            # Cosine similarity with Topic
-            sim_topic = float(cosine_similarity(question_vec, topic_vec)[0][0])
+        if HAS_SKLEARN:
+            try:
+                vectorizer = TfidfVectorizer(
+                    ngram_range=(1, 3),
+                    analyzer="word",
+                    stop_words="english",
+                    token_pattern=r"(?u)\b[\w-]+\b",
+                )
+                tfidf_matrix = vectorizer.fit_transform(corpus)
+                question_vec = tfidf_matrix[0:1]
+                topic_vec = tfidf_matrix[1:2]
+                label_vecs = tfidf_matrix[2:]
 
-            # Cosine similarities with each fact label
-            sim_labels: List[Tuple[str, float]] = []
-            if label_vecs.shape[0] > 0:
-                label_sims = cosine_similarity(question_vec, label_vecs)[0]
-                for idx, lbl in enumerate(fact_labels):
-                    sim_labels.append((lbl, float(label_sims[idx])))
+                # Cosine similarity with Topic
+                sim_topic = float(cosine_similarity(question_vec, topic_vec)[0][0])
 
-        except Exception as exc:
-            # Fallback for empty vocabulary or punctuation-only input
-            logger.debug(f"TF-IDF vectorizer fallback: {exc}")
-            sim_topic = 0.0
-            sim_labels = [(lbl, 0.0) for lbl in fact_labels]
+                # Cosine similarities with each fact label
+                sim_labels = []
+                if label_vecs.shape[0] > 0:
+                    label_sims = cosine_similarity(question_vec, label_vecs)[0]
+                    for idx, lbl in enumerate(fact_labels):
+                        sim_labels.append((lbl, float(label_sims[idx])))
+
+            except Exception as exc:
+                # Fallback for empty vocabulary or punctuation-only input
+                logger.debug(f"TF-IDF vectorizer fallback: {exc}")
+                sim_topic = 0.0
+                sim_labels = [(lbl, 0.0) for lbl in fact_labels]
 
         # Token stemming / substring matching bonus (handles compound words like "roll back" vs "rollback")
         q_tokens = set(re.findall(r"\w+", cleaned_question.lower())) - COMMON_STOPWORDS
